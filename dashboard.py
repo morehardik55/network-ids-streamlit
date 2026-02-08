@@ -1,0 +1,139 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.ensemble import IsolationForest
+from sklearn.decomposition import PCA
+from datetime import datetime
+import matplotlib.pyplot as plt
+
+st.set_page_config(page_title="Network IDS Dashboard", layout="wide")
+
+st.title("🚨 Network Intrusion Detection System (ML-based)")
+st.caption("Cybersecurity + Machine Learning")
+
+# -----------------------------
+# Load Dataset
+# -----------------------------
+@st.cache_data
+def load_data():
+    return pd.read_csv("KDDTrain+.txt", header=None)
+
+data = load_data()
+st.success("Dataset Loaded Successfully")
+
+# -----------------------------
+# Preprocessing
+# -----------------------------
+encoder = LabelEncoder()
+for col in [1, 2, 3]:
+    data[col] = encoder.fit_transform(data[col])
+
+data[41] = data[41].apply(lambda x: 0 if x == "normal" else 1)
+
+X = data.drop(41, axis=1)
+y = data[41]
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# -----------------------------
+# Sidebar Controls
+# -----------------------------
+st.sidebar.header("⚙️ Detection Controls")
+
+threshold_percent = st.sidebar.slider(
+    "Anomaly Threshold (%)",
+    min_value=10,
+    max_value=50,
+    value=30
+)
+
+n_estimators = st.sidebar.slider(
+    "Number of Trees",
+    min_value=50,
+    max_value=300,
+    value=200
+)
+
+# -----------------------------
+# Train Model
+# -----------------------------
+model = IsolationForest(
+    n_estimators=n_estimators,
+    contamination=0.45,
+    random_state=42
+)
+
+model.fit(X_scaled)
+scores = model.decision_function(X_scaled)
+threshold = np.percentile(scores, threshold_percent)
+pred = np.where(scores < threshold, 1, 0)
+
+# -----------------------------
+# SOC METRICS
+# -----------------------------
+st.subheader("📊 SOC Overview")
+
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric("Total Traffic", len(pred))
+col2.metric("Threats Detected", int(np.sum(pred)))
+col3.metric("Safe Traffic", int(len(pred) - np.sum(pred)))
+col4.metric("Threat %", f"{(np.sum(pred)/len(pred))*100:.2f}%")
+
+st.caption(f"🕒 Scan Time: {datetime.now()}")
+
+# -----------------------------
+# Alerts
+# -----------------------------
+st.subheader("🚨 Live Alerts (Sample)")
+
+alert_df = pd.DataFrame({
+    "Connection": range(1, 11),
+    "Status": ["🚨 Anomaly" if scores[i] < threshold else "✅ Normal" for i in range(10)],
+    "Score": scores[:10]
+})
+
+st.dataframe(alert_df, use_container_width=True)
+
+# -----------------------------
+# PCA Visualization
+# -----------------------------
+st.subheader("📈 Traffic Visualization")
+
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X_scaled)
+
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.scatter(X_pca[pred == 0, 0], X_pca[pred == 0, 1],
+           c="green", alpha=0.3, s=5, label="Normal")
+ax.scatter(X_pca[pred == 1, 0], X_pca[pred == 1, 1],
+           c="red", alpha=0.6, s=10, label="Anomaly")
+
+ax.set_title("Network Traffic Anomaly Detection")
+ax.set_xlabel("Principal Component 1")
+ax.set_ylabel("Principal Component 2")
+ax.legend()
+ax.grid(True)
+
+st.pyplot(fig)
+
+# -----------------------------
+# Download Anomalies
+# -----------------------------
+st.subheader("📁 Forensic Report")
+
+anomalies = data[pred == 1].copy()
+anomalies["anomaly_score"] = scores[pred == 1]
+
+csv = anomalies.to_csv(index=False).encode("utf-8")
+
+st.download_button(
+    label="⬇️ Download Detected Anomalies CSV",
+    data=csv,
+    file_name="detected_anomalies.csv",
+    mime="text/csv"
+)
+
+st.success("IDS Dashboard Running Successfully 🚀")
