@@ -1,4 +1,44 @@
 import streamlit as st
+
+# -----------------------------
+# LOGIN CONFIGURATION
+# -----------------------------
+VALID_USERS = {
+    "admin": "admin123",
+    "analyst": "ids2026"
+}
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+def login():
+    st.title("🔐 Secure Login")
+    st.subheader("Network IDS Dashboard")
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if username in VALID_USERS and VALID_USERS[username] == password:
+            st.session_state.logged_in = True
+            st.session_state.user = username
+            st.success("Login successful")
+            st.rerun()
+        else:
+            st.error("Invalid username or password")
+
+def logout():
+    st.session_state.logged_in = False
+    st.rerun()
+
+# -----------------------------
+# LOGIN CHECK
+# -----------------------------
+if not st.session_state.logged_in:
+    login()
+    st.stop()
+
+import streamlit as st
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, StandardScaler
@@ -40,6 +80,13 @@ X_scaled = scaler.fit_transform(X)
 # -----------------------------
 # Sidebar Controls
 # -----------------------------
+
+st.sidebar.markdown("### 👤 User")
+st.sidebar.write(f"Logged in as: **{st.session_state.user}**")
+
+if st.sidebar.button("Logout"):
+    logout()
+
 st.sidebar.header("⚙️ Detection Controls")
 
 threshold_percent = st.sidebar.slider(
