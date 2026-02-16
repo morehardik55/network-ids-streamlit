@@ -41,9 +41,6 @@ A machine learning–based Intrusion Detection System (IDS) that detects anomalo
 ---
 
 ## 🔐 Authentication
-Demo credentials:
-- **admin / admin123**
-- **analyst / ids2026**
 
 ---
 
